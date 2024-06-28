@@ -24,6 +24,7 @@ class Solver(Enum):
     petsc = 2
 
 SolverChoice = Solver.ipopt
+scaling = 1
 
 m = ConcreteModel()
 m.tf = Param(initialize=0.8e-3) # 8 mm
@@ -46,12 +47,12 @@ m.Tb0 = Param(initialize=304.65) # K
 m.Tp0 = Param(initialize=304.65) # K
 m.Db = Param(initialize=1.7657e-9) # m2/s
 m.Dp = Param(initialize=1.7354e-9) # m2/s
-m.Jw0 = Param(initialize=4.41493388e-06)
-m.Js0 = Param(initialize=6.39196682e-09)
-m.Cw0 = Param(initialize=7.54837839e-02)
-m.kx0 = Param(initialize=1.76938225e-06)
+m.Jw0 = Param(initialize=3.14472750e-06)
+m.Js0 = Param(initialize=5.17374784e-09)
+m.Cw0 = Param(initialize=6.10976363e-02)
+m.kx0 = Param(initialize=1.37700821e-06)
 
-m.t = ContinuousSet(bounds=(0, 1800))
+m.t = ContinuousSet(bounds=(0, 100))
 m.x = ContinuousSet(bounds=(0, 1))
 m.Cb = Var(m.x, m.t, within=NonNegativeReals, initialize=m.Cb0)
 m.Cp = Var(m.x, m.t, within=NonNegativeReals, initialize=m.Cp0)
@@ -265,34 +266,35 @@ discretizer2.apply_to(m, nfe=30, wrt=m.t, scheme='BACKWARD')
 # discretizer.apply_to(m,nfe=6,wrt=m.x,scheme='BACKWARD')
 # discretizer.apply_to(m,nfe=120,wrt=m.t,scheme='BACKWARD')
 
-# create the scaling factors
-m.scaling_factor = Suffix(direction=Suffix.EXPORT)
-m.scaling_factor[m.diffeq1] = 1e4 # scale Cb eq
-m.scaling_factor[m.diffeq2] = 1e8 # scale Cp eq
-m.scaling_factor[m.diffeq3] = 1e5 # scale Fb eq
-# m.scaling_factor[m.diffeq3] = 1e1 # scale Pb eq
-# m.scaling_factor[m.diffeq5] = 1e1 # scale Tb eq
-# m.scaling_factor[m.diffeq6] = 1e1 # scale Tp eq
-m.scaling_factor[m.algeq1] = 1e7 # scale Jw eq
-m.scaling_factor[m.algeq2] = 1e9  # scale Js eq
-m.scaling_factor[m.algeq4] = 1e6  # scale kx eq
-m.scaling_factor[m.Cb] = 1e4    # scale the Cb variable
-m.scaling_factor[m.Cp] = 1e8    # scale the Cp variable
-m.scaling_factor[m.Fb] = 1e5    # scale the Fb variable
-m.scaling_factor[m.Jw] = 1e7    # scale the Jw variable
-m.scaling_factor[m.Js] = 1e9    # scale the Js variable
-m.scaling_factor[m.kx] = 1e6    # scale the kx variable
-m.scaling_factor[m.dCbdt] = 1e3    # scale the Cb variable
-m.scaling_factor[m.dCpdt] = 1e3    # scale the Cp variable
-m.scaling_factor[m.dFbdt] = 1e3    # scale the Fb variable
-m.scaling_factor[m.dPbdt] = 1e3    # scale the Pb variable
-# m.scaling_factor[m.dTbdt] = 1e2    # scale the Tb variable
-# m.scaling_factor[m.dTpdt] = 1e2    # scale the Tp variable
-m.scaling_factor[m.dCbdx] = 1e3    # scale the Cb variable
-m.scaling_factor[m.dCpdx] = 1e3    # scale the Cp variable
-iscale.calculate_scaling_factors(m)
-scaled_model = TransformationFactory('core.scale_model').create_using(m)
-print("Degrees of Freedom after Discretization = ", degrees_of_freedom(m))
+if scaling == 1:
+    # create the scaling factors
+    m.scaling_factor = Suffix(direction=Suffix.EXPORT)
+    m.scaling_factor[m.diffeq1] = 1e4 # scale Cb eq
+    m.scaling_factor[m.diffeq2] = 1e8 # scale Cp eq
+    m.scaling_factor[m.diffeq3] = 1e5 # scale Fb eq
+    # m.scaling_factor[m.diffeq3] = 1e1 # scale Pb eq
+    # m.scaling_factor[m.diffeq5] = 1e1 # scale Tb eq
+    # m.scaling_factor[m.diffeq6] = 1e1 # scale Tp eq
+    m.scaling_factor[m.algeq1] = 1e7 # scale Jw eq
+    m.scaling_factor[m.algeq2] = 1e9  # scale Js eq
+    m.scaling_factor[m.algeq4] = 1e7  # scale kx eq
+    m.scaling_factor[m.Cb] = 1e4    # scale the Cb variable
+    m.scaling_factor[m.Cp] = 1e8    # scale the Cp variable
+    m.scaling_factor[m.Fb] = 1e5    # scale the Fb variable
+    m.scaling_factor[m.Jw] = 1e7    # scale the Jw variable
+    m.scaling_factor[m.Js] = 1e9    # scale the Js variable
+    m.scaling_factor[m.kx] = 1e7    # scale the kx variable
+    m.scaling_factor[m.dCbdt] = 1e3    # scale the Cb variable
+    m.scaling_factor[m.dCpdt] = 1e3    # scale the Cp variable
+    m.scaling_factor[m.dFbdt] = 1e3    # scale the Fb variable
+    m.scaling_factor[m.dPbdt] = 1e3    # scale the Pb variable
+    # m.scaling_factor[m.dTbdt] = 1e2    # scale the Tb variable
+    # m.scaling_factor[m.dTpdt] = 1e2    # scale the Tp variable
+    m.scaling_factor[m.dCbdx] = 1e3    # scale the Cb variable
+    m.scaling_factor[m.dCpdx] = 1e3    # scale the Cp variable
+    iscale.calculate_scaling_factors(m)
+    scaled_model = TransformationFactory('core.scale_model').create_using(m)
+    print("Degrees of Freedom after Discretization = ", degrees_of_freedom(m))
 
 if SolverChoice == Solver.ipopt:
 
@@ -306,7 +308,10 @@ if SolverChoice == Solver.ipopt:
     solver.options['nlp_scaling_method'] = 'user-scaling'
     solver.options['OF_ma57_automatic_scaling'] = 'yes'
     solver.options['halt_on_ampl_error'] = 'no'
-    results = solver.solve(scaled_model, tee=True)
+    if scaling == 1:
+        results = solver.solve(scaled_model, tee=True)
+    else:
+        results = solver.solve(m, tee=True)
 
 else:
     idaeslog.solver_log.tee = True
@@ -334,7 +339,7 @@ else:
             # "-ksp_converged_reason": "",
             # "-snes_test_jacobian": "",
             "snes_grid_sequence": "",
-            "-pc_type": "svd",
+            "-pc_type": "lu",
             # "-mat_view": "",
             "--ts_save_trajectory": 1,
             "--ts_trajectory_type": "visualization",
@@ -360,7 +365,7 @@ else:
     for result in results.results:
         assert_optimal_termination(result)
 
-TransformationFactory('core.scale_model').propagate_solution(scaled_model, m)
+if scaling == 1: TransformationFactory('core.scale_model').propagate_solution(scaled_model, m)
 
 x = []
 t = []
@@ -406,7 +411,19 @@ from mpl_toolkits.mplot3d.axes3d import Axes3D
 
 x, t, Cb, Cp, Fb, Jw, Js, Cw, kx = np.array(x), np.array(t), np.array(Cb), np.array(Cp), np.array(Fb), np.array(Jw), np.array(Js), np.array(Cw), np.array(kx)
 Cp_av = np.sum(Cp, axis=0)
-# print(Cp)
+Cb_xL = Cb[-1,-1]
+Rej_av = (1-Cp_av[-1]/Cb_xL)*100
+
+print('Jw0 model vs real: ', Jw[0,0], 3.14472750e-06)
+print('Js0 model vs real: ', Js[0,0], 5.17374784e-09)
+print('Cw0 model vs real: ', Cw[0,0], 6.10976363e-02)
+print('kx0 model vs real: ', kx[0,0], 1.37700821e-06)
+print('Min of params error at 0: ', min([abs(Jw[0,0] - 3.14472750e-06), abs(Js[0,0] - 5.17374784e-09), abs(Cw[0,0] - 6.10976363e-02), abs(kx[0,0] - 1.37700821e-06)]))
+print('Cb[x=0,t=1]: ', Cb[0,1])
+print('Cb[x=L,t=End]: ', Cb_xL, '0.00675')
+print('Fb[x=L,t=End]: ', Fb[-1,-1], '0.0001951')
+print('Cpav[t=End]: ', Cp_av, '0.00182')
+print('Rej_av = ', Rej_av, '73.08')
 
 fig = plt.figure()
 ax = fig.add_subplot(1, 1, 1, projection='3d')
@@ -421,12 +438,3 @@ ax.set_ylabel('Cb(x=L)')
 ax.plot(t[0,:], Cb[-1,:])
 # ax.set_xlim([0, 100])
 plt.show()
-print('Jw0 model vs real: ', Jw[0,0], 4.41493388e-06)
-print('Js0 model vs real: ', Js[0,0], 6.39196682e-09)
-print('Cw0 model vs real: ', Cw[0,0], 7.54837839e-02)
-print('kx0 model vs real: ', kx[0,0], 1.76938225e-06)
-print('Min of params error at 0: ', min([abs(Jw[0,0] - 4.41493388e-06), abs(Js[0,0] - 6.39196682e-09), abs(Cw[0,0] - 7.54837839e-02), abs(kx[0,0] - 1.76938225e-06)]))
-print('Cb[x=0,t=1]: ', Cb[0,1])
-print('Cb[x=L,t=End]: ', Cb[-1,-1], '0.00675')
-print('Fb[x=L,t=End]: ', Fb[-1,-1], '0.0001951')
-print('Cpav[t=End]: ', Cp_av, '0.00182')
