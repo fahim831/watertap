@@ -23,8 +23,11 @@ class Solver(Enum):
     ipopt = 1
     petsc = 2
 
-SolverChoice = Solver.ipopt
-scaling = 1
+SolverChoice = Solver.petsc
+if SolverChoice == Solver.ipopt:
+    scaling = 1
+else:
+    scaling = 0
 
 m = ConcreteModel()
 m.tf = Param(initialize=0.8e-3) # 8 mm
@@ -49,7 +52,7 @@ m.Db = Param(initialize=1.7657e-9) # m2/s
 m.Dp = Param(initialize=1.7354e-9) # m2/s
 m.Jw0 = Param(initialize=3.14472750e-06)
 m.Js0 = Param(initialize=5.17374784e-09)
-m.Cw0 = Param(initialize=6.10976363e-02)
+m.Cw0 = Param(initialize=2.10976363e-02)
 m.kx0 = Param(initialize=1.37700821e-06)
 
 m.t = ContinuousSet(bounds=(0, 100))
@@ -69,12 +72,12 @@ m.kx = Var(m.x, m.t, within=NonNegativeReals, initialize=m.kx0)
     # m.add_component('x%s' % i, Var(m.x, m.t))
 
 m.dCbdt = DerivativeVar(m.Cb, wrt=m.t, initialize=1.0)
-m.dCpdt = DerivativeVar(m.Cp, wrt=m.t, initialize=1.0)
-m.dFbdt = DerivativeVar(m.Fb, wrt=m.t, initialize=1.0)
+m.dCpdt = DerivativeVar(m.Cp, wrt=m.t, initialize=10.0)
+m.dFbdt = DerivativeVar(m.Fb, wrt=m.t, initialize=-1.0)
 m.dPbdt = DerivativeVar(m.Pb, wrt=m.t, initialize=1.0)
-m.dTbdt = DerivativeVar(m.Tb, wrt=m.t, initialize=1.0)
-m.dTpdt = DerivativeVar(m.Tp, wrt=m.t, initialize=1.0)
-m.dCbdx = DerivativeVar(m.Cb, wrt=m.x, initialize=1.0)
+m.dTbdt = DerivativeVar(m.Tb, wrt=m.t, initialize=0.0)
+m.dTpdt = DerivativeVar(m.Tp, wrt=m.t, initialize=0.0)
+m.dCbdx = DerivativeVar(m.Cb, wrt=m.x, initialize=-1.0)
 m.dCpdx = DerivativeVar(m.Cp, wrt=m.x, initialize=1.0)
 m.dFbdx = DerivativeVar(m.Fb, wrt=m.x, initialize=1.0)
 m.dPbdx = DerivativeVar(m.Pb, wrt=m.x, initialize=1.0)
@@ -128,10 +131,10 @@ def _diffeq6(m, i, j): # Tp PDE
 
 m.diffeq6 = Constraint(m.x, m.t, rule=_diffeq6)
 
-# def _diffeq7(m, i, j): # Fb PDE for dx
+# def _diffeq7(m, i, j): # Fp PDE for dx
 #     if i == 0:
 #         return Constraint.Skip
-#     return m.dFbdx[i, j] == -m.W*m.Jw[i, j]
+#     return m.dFpdx[i, j] == m.W*m.Jw[i, j]
 
 # m.diffeq7 = Constraint(m.x, m.t, rule=_diffeq7)
 
@@ -350,7 +353,7 @@ else:
             "-snes_stol": 0,
             "-snes_atol": 1e-8,
         },
-        skip_initial=True,
+        skip_initial=False,
         initial_solver="ipopt",
         initial_solver_options={
             "constr_viol_tol": 1e-8,
@@ -376,6 +379,8 @@ Jw = []
 Js = []
 Cw = []
 kx = []
+Tb = []
+Tp = []
 
 for i in sorted(m.x):
     tempCb = []
@@ -386,6 +391,8 @@ for i in sorted(m.x):
     tempJs = []
     tempCw = []
     tempkx = []
+    tempTb = []
+    tempTp = []
     for j in sorted(m.t):
         tempx.append(i)
         tempCb.append(value(m.Cb[i, j]))
@@ -395,6 +402,8 @@ for i in sorted(m.x):
         tempJs.append(value(m.Js[i, j]))
         tempCw.append(value(m.Cw[i, j]))
         tempkx.append(value(m.kx[i, j]))
+        tempTb.append(value(m.Tb[i, j]))
+        tempTp.append(value(m.Tp[i, j]))
     x.append(tempx)
     t.append(sorted(m.t))
     Cb.append(tempCb)
@@ -404,13 +413,16 @@ for i in sorted(m.x):
     Js.append(tempJs)
     Cw.append(tempCw)
     kx.append(tempkx)
+    Tb.append(tempTb)
+    Tp.append(tempTp)
 
 import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d.axes3d import Axes3D
 
-x, t, Cb, Cp, Fb, Jw, Js, Cw, kx = np.array(x), np.array(t), np.array(Cb), np.array(Cp), np.array(Fb), np.array(Jw), np.array(Js), np.array(Cw), np.array(kx)
-Cp_av = np.sum(Cp, axis=0)
+x, t, Cb, Cp, Fb, Jw, Js, Cw, kx, Tb, Tp = np.array(x), np.array(t), np.array(Cb), np.array(Cp), np.array(Fb), np.array(Jw), np.array(Js), np.array(Cw), np.array(kx), np.array(Tb), np.array(Tp)
+print(Cp)
+Cp_av = np.sum(Cp, axis=1)
 Cb_xL = Cb[-1,-1]
 Rej_av = (1-Cp_av[-1]/Cb_xL)*100
 
@@ -426,15 +438,23 @@ print('Cpav[t=End]: ', Cp_av, '0.00182')
 print('Rej_av = ', Rej_av, '73.08')
 
 fig = plt.figure()
-ax = fig.add_subplot(1, 1, 1, projection='3d')
+ax = fig.add_subplot(1, 2, 1, projection='3d')
 ax.set_xlabel('Distance x')
 ax.set_ylabel('Time t')
 ax.plot_wireframe(x, t, Cb, rstride=1, cstride=1)
-plt.show()
+ax = fig.add_subplot(1, 2, 2, projection='3d')
+ax.set_xlabel('Distance x')
+ax.set_ylabel('Time t')
+ax.plot_wireframe(x, t, Cp, rstride=1, cstride=1)
+plt.show(block=False)
+plt.pause(1)
+plt.close()
 fig = plt.figure()
 ax = fig.add_subplot(1, 1, 1)
 ax.set_xlabel('Time t')
 ax.set_ylabel('Cb(x=L)')
 ax.plot(t[0,:], Cb[-1,:])
 # ax.set_xlim([0, 100])
-plt.show()
+plt.show(block=False)
+plt.pause(1)
+plt.close()
