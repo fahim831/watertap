@@ -1,0 +1,7 @@
+linear_solver ma27
+resto_penalty_parameter 20000
+constr_viol_tol 1e-3
+nlp_scaling_method user-scaling
+tol 1e-8
+check_derivatives_for_naninf yes
+print_info_string yes
