@@ -206,9 +206,6 @@ class TestAnaerobicDigester(UnitTestHarness):
         self.unit_solutions[m.fs.unit.electricity_consumption[0]] = 23.7291667
         self.unit_solutions[m.fs.unit.hydraulic_retention_time[0]] = 1880470.588
 
-<<<<<<< HEAD
-        return m
-=======
         # Conservation check
 
         self.conservation_equality = {
@@ -241,4 +238,3 @@ class TestAnaerobicDigester(UnitTestHarness):
         }
 
         return m
->>>>>>> main
