@@ -46,8 +46,8 @@ m.Cb0 = Param(initialize=6.226e-3) # kmol/m3
 m.Cp0 = Param(initialize=0.0) # kmol/m3
 m.Fb0 = Param(initialize=2.166e-4) # m3/s
 m.Pb0 = Param(initialize=5.83) # atm
-m.Tb  = Param(initialize=304.65) # K
-m.Tp  = Param(initialize=304.65) # K
+m.Tb  = Param(initialize=304.15) # K
+m.Tp  = Param(initialize=304.15) # K
 m.Db  = Param(initialize=1.7657e-9) # m2/s
 m.Dp  = Param(initialize=1.7354e-9) # m2/s
 m.Jw0 = Param(initialize=3.14472750e-06)
@@ -138,9 +138,9 @@ def _algeq4(m, i, j): # kx Algebraic Equation
 m.algeq4 = Constraint(m.x, m.t, rule=_algeq4)
 
 # def _algeq5(m, i, j): # Fp Algebraic Equation
-#     if i == 0:
+#     if i == 0 and j != 0:
 #         return Constraint.Skip
-#     return m.Fp[i, j] == m.Fb0 - m.Fb[i, j]
+#     # return m.Fp[i, j] == m.Fb0 - m.Fb[i, j]
 #     return m.Fp[i, j]*m.Cp[i, j] == m.Fb0*m.Cb0 - m.Fb[i, j]*m.Cb[i, j]
 
 # m.algeq5 = Constraint(m.x, m.t, rule=_algeq5)
@@ -218,7 +218,7 @@ m.obj = Objective(expr=1)
 # Discretize using Finite Difference and Collocation
 discretizer = TransformationFactory('dae.collocation')
 discretizer2 = TransformationFactory('dae.finite_difference')
-discretizer.apply_to(m, nfe=5, ncp=3, wrt=m.x)
+discretizer.apply_to(m, nfe=5, ncp=2, wrt=m.x)
 discretizer2.apply_to(m, nfe=30, wrt=m.t, scheme='BACKWARD')
 
 # Discretize using Finite Difference Method
@@ -229,15 +229,15 @@ discretizer2.apply_to(m, nfe=30, wrt=m.t, scheme='BACKWARD')
 if scaling == 1:
     # create the scaling factors
     m.scaling_factor = Suffix(direction=Suffix.EXPORT)
-    m.scaling_factor[m.diffeq1] = 1e5 # scale Cb eq
-    m.scaling_factor[m.diffeq2] = 1e5 # scale Cp eq
+    m.scaling_factor[m.diffeq1] = 1e4 # scale Cb eq
+    m.scaling_factor[m.diffeq2] = 1e4 # scale Cp eq
     m.scaling_factor[m.diffeq3] = 1e5 # scale Fb eq
-    m.scaling_factor[m.diffeq3] = 1e1 # scale Pb eq
+    # m.scaling_factor[m.diffeq3] = 1e1 # scale Pb eq
     m.scaling_factor[m.algeq1] = 1e7 # scale Jw eq
     m.scaling_factor[m.algeq2] = 1e10  # scale Js eq
     m.scaling_factor[m.algeq4] = 1e7  # scale kx eq
-    m.scaling_factor[m.Cb] = 1e5    # scale the Cb variable
-    m.scaling_factor[m.Cp] = 1e5    # scale the Cp variable
+    m.scaling_factor[m.Cb] = 1e4    # scale the Cb variable
+    m.scaling_factor[m.Cp] = 1e4    # scale the Cp variable
     m.scaling_factor[m.Fb] = 1e5    # scale the Fb variable
     m.scaling_factor[m.Jw] = 1e7    # scale the Jw variable
     m.scaling_factor[m.Js] = 1e10    # scale the Js variable
@@ -253,21 +253,29 @@ if scaling == 1:
     print("Degrees of Freedom after Discretization = ", degrees_of_freedom(m))
 
 if SolverChoice == Solver.ipopt:
-
-    solver = SolverFactory('ipopt')
-    print(solver._version)
-    # solver.options['max_iter'] = 1000
-    solver.options['linear_solver'] = 'mumps'
-    solver.options['tol'] = 1e-8
-    # solver.options['print_level'] = 6
-    # solver.options['hsllib'] = '/usr/local/fya/watertap/hsl_ma97-2.8.1'
-    solver.options['nlp_scaling_method'] = 'user-scaling'
-    solver.options['OF_ma57_automatic_scaling'] = 'yes'
-    solver.options['halt_on_ampl_error'] = 'no'
-    if scaling == 1:
-        results = solver.solve(scaled_model, tee=True)
-    else:
-        results = solver.solve(m, tee=True)
+    with SolverFactory("ipopt") as solver:
+        print(solver._version)
+        solver.options.option_file_name = "solveroptions.opt"
+        with open("solveroptions.opt", "w") as f:
+            f.write("linear_solver ma27\n")
+            f.write("resto_penalty_parameter 20000\n")
+            # f.write("delta 10\n")
+            # f.write("s_theta 5\n")
+            # f.write("gamma_theta 1e-3\n")
+            # f.write("start_with_resto yes\n")
+            # f.write("constraint_violation_norm_type max-norm\n")
+            f.write("constr_viol_tol 1e-3\n")
+            f.write("nlp_scaling_method user-scaling\n")
+            # f.write("max_iter 3\n")
+            f.write("tol 1e-8\n")
+            f.write("check_derivatives_for_naninf yes\n")
+            f.write("print_info_string yes\n")
+            # f.write("print_level 6\n")
+            # f.write("halt_on_ampl_error no\n")
+        if scaling == 1:
+            results = solver.solve(scaled_model, tee=True)
+        else:
+            results = solver.solve(m, tee=True)
     # assert_optimal_termination(results)
 
 else:
@@ -334,6 +342,7 @@ Jw = []
 Js = []
 Cw = []
 kx = []
+# Fp = []
 
 for i in sorted(m.x):
     tempCb = []
@@ -345,6 +354,7 @@ for i in sorted(m.x):
     tempJs = []
     tempCw = []
     tempkx = []
+    # tempFp = []
     for j in sorted(m.t):
         tempx.append(i)
         tempCb.append(value(m.Cb[i, j]))
@@ -355,6 +365,7 @@ for i in sorted(m.x):
         tempJs.append(value(m.Js[i, j]))
         tempCw.append(value(m.Cw[i, j]))
         tempkx.append(value(m.kx[i, j]))
+        # tempFp.append(value(m.Fp[i, j]))
     x.append(tempx)
     t.append(sorted(m.t))
     Cb.append(tempCb)
@@ -365,15 +376,24 @@ for i in sorted(m.x):
     Js.append(tempJs)
     Cw.append(tempCw)
     kx.append(tempkx)
+    # Fp.append(tempFp)
 
 import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d.axes3d import Axes3D
 
 x, t, Cb, Cp, Fb, Pb, Jw, Js, Cw, kx = np.array(x), np.array(t), np.array(Cb), np.array(Cp), np.array(Fb), np.array(Pb), np.array(Jw), np.array(Js), np.array(Cw), np.array(kx)
-Cp_av = np.sum(Cp, axis=1)
-Cb_xL = Cb[-1,-1]
-Rej_av = (1-Cp_av[-1]/Cb_xL)*100
+# Fp = np.array(Fp)
+Fp = np.array(m.Fb0 - Fb)
+Cp_av = np.sum(Cp, axis=0) # axis=0 sums all x at each t
+Cb_xL_t_end = Cb[-1,-1]
+Fb_t_end = Fb[:,-1]
+Fp_t_end = Fp[:,-1]
+Rej_av = (1-Cp_av[-1]/Cb_xL_t_end)*100
+tot_retentate_flow_rate = np.sum(Fb, axis=1) # axis=1 sums all t at each x
+tot_permeate_flow_rate = np.sum(Fp, axis=1) # axis=1 sums all t at each x
+Rec_x = Fp_t_end/m.Fb0*100
+Rec_tot = tot_permeate_flow_rate/m.Fb0*100
 
 print('Jw0 model vs real: ', Jw[0,0], 3.14472750e-06)
 print('Js0 model vs real: ', Js[0,0], 5.17374784e-09)
@@ -381,13 +401,15 @@ print('Cw0 model vs real: ', Cw[0,0], 6.10976363e-02)
 print('kx0 model vs real: ', kx[0,0], 1.37700821e-06)
 print('Min of params error at 0: ', min([abs(Jw[0,0] - 3.14472750e-06), abs(Js[0,0] - 5.17374784e-09), abs(Cw[0,0] - 6.10976363e-02), abs(kx[0,0] - 1.37700821e-06)]))
 print('Cb[x=0,t=1]: ', Cb[0,1])
-print('Cb[x=L,t=End]: ', Cb_xL, '0.00675')
+print('Cb[x=L,t=End]: ', Cb[-1,-1], '0.00675')
 print('Fb[x=L,t=End]: ', Fb[-1,-1], '0.0001951')
 print('Cpav[t=End]: ', Cp_av, '0.00182')
 print('Cp_tot: ', np.sum(Cp_av))
 print('Rej_av = ', Rej_av, '73.08')
 # print('Eq 7 residual: ', (Cw-Cp)/(Cb-Cp)-np.exp(Jw/kx))
-# print(Cp)
+# print('x: ', x)
+# print('Fb: ', Fb)
+# print('Fp: ', Fp)
 
 fig = plt.figure()
 ax = fig.add_subplot(1, 2, 1, projection='3d')
@@ -397,7 +419,7 @@ ax.plot_wireframe(x, t, Cb, rstride=1, cstride=1)
 ax = fig.add_subplot(1, 2, 2, projection='3d')
 ax.set_xlabel('Distance x')
 ax.set_ylabel('Time t')
-ax.plot_wireframe(x, t, Cp, rstride=1, cstride=1)
+ax.plot_wireframe(x, t, Jw, rstride=1, cstride=1)
 plt.show(block=False)
 plt.pause(2)
 plt.close()
@@ -410,3 +432,8 @@ ax.plot(t[0,:], Cb[-1,:])
 plt.show(block=False)
 plt.pause(1)
 plt.close()
+print('Fb_t_end: ', Fb_t_end)
+print('Fp_t_end: ', Fp_t_end)
+print('Tot ret+perm outlet Fb+Fp: ', tot_retentate_flow_rate+tot_permeate_flow_rate)
+print('Rec_x: ', Rec_x)
+print('Rec_tot: ', Rec_tot)
