@@ -15,5 +15,9 @@ Flowsheets
    crystallization
    ion_exchange
    gac
+   generic_desalination_train
+   lsrro
+   membrane_distillation
    mvc
+   RO_with_energy_recovery
    seawater_RO_desalination
