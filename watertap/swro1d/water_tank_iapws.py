@@ -61,12 +61,12 @@ def main():
     # m.fs.wtank.display()
 
     iscale.calculate_scaling_factors(m)
-    m.fs.wtank.initialize(outlvl=3)
+    # m.fs.wtank.initialize(outlvl=3)
 
     # Solve the simulation using ipopt
     # Note: If the degrees of freedom = 0, we have a square problem
     opt = pyo.SolverFactory("ipopt")
-    optarg = {"tol": 1e-7, "linear_solver": "mumps", "max_iter": 40}
+    optarg = {"tol": 1e-7, "linear_solver": "ma27", "max_iter": 40}
     opt.options = optarg
     solve_status = opt.solve(m, tee=True)
 

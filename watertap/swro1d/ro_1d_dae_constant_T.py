@@ -145,7 +145,7 @@ m.algeq4 = Constraint(m.x, m.t, rule=_algeq4)
 
 # m.algeq5 = Constraint(m.x, m.t, rule=_algeq5)
 
-def _initcon_1(m, i):
+def _initcon_1(m, i): # i=x
     if i == 1:
         return Constraint.Skip
     return m.Cb[i, 0] == m.Cb0
@@ -169,7 +169,7 @@ def _initcon_4(m, i):
 
 m.initcon_4 = Constraint(m.x, rule=_initcon_4)
 
-def _leftbccon_1(m, j):
+def _leftbccon_1(m, j): # j=t
     if j == 0: # To avoid (0,0) as already specified in IC
         return Constraint.Skip
     return m.Cb[0, j] == m.Cb0
@@ -203,7 +203,6 @@ def _upperbound_1(m, j):
 m.upperbound_1 = Constraint(m.t, rule=_upperbound_1)
 
 def _upperbound_2(m, j):
-    # return m.dCpdx[1, j] == 0
     return m.dCpdx[1, j] == 0
 
 m.upperbound_2 = Constraint(m.t, rule=_upperbound_2)
@@ -237,7 +236,7 @@ if scaling == 1:
     m.scaling_factor[m.algeq2] = 1e10  # scale Js eq
     m.scaling_factor[m.algeq4] = 1e7  # scale kx eq
     m.scaling_factor[m.Cb] = 1e4    # scale the Cb variable
-    m.scaling_factor[m.Cp] = 1e4    # scale the Cp variable
+    m.scaling_factor[m.Cp] = 1e6    # scale the Cp variable
     m.scaling_factor[m.Fb] = 1e5    # scale the Fb variable
     m.scaling_factor[m.Jw] = 1e7    # scale the Jw variable
     m.scaling_factor[m.Js] = 1e10    # scale the Js variable

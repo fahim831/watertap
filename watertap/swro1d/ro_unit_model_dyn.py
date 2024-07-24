@@ -34,7 +34,8 @@ from watertap.unit_models.reverse_osmosis_0D import (ReverseOsmosis0D,
 m = ConcreteModel()
 m.fs = FlowsheetBlock(
     dynamic=True,
-    time_set=[0, 3],
+    # has_holdup=True,
+    time_set=[0, 1, 2, 3],
     time_units=pyunits.s
 )
 # m.fs = FlowsheetBlock(dynamic=False)
@@ -42,6 +43,7 @@ m.fs.properties = NaClParameterBlock()
 
 # Add an RO unit to the flowsheet.
 m.fs.unit = ReverseOsmosis0D(
+    has_holdup=True,
     property_package=m.fs.properties,
     concentration_polarization_type=ConcentrationPolarizationType.none,
     mass_transfer_coefficient=MassTransferCoefficient.none,
@@ -56,6 +58,8 @@ m.fs.unit.area.fix(50)                                             # membrane ar
 m.fs.unit.A_comp.fix(4.2e-12)                                      # membrane water permeability (m/Pa/s)
 m.fs.unit.B_comp.fix(3.5e-8)                                       # membrane salt permeability (m/s)
 m.fs.unit.permeate.pressure[0].fix(101325)                         # permeate pressure (Pa)
+m.fs.unit.permeate.pressure[1].fix(101325)                         # permeate pressure (Pa)
+m.fs.unit.permeate.pressure[2].fix(101325)                         # permeate pressure (Pa)
 
 # Set scaling factors for component mass flowrates.
 m.fs.properties.set_default_scaling('flow_mass_phase_comp', 1, index=('Liq', 'H2O'))
@@ -71,28 +75,33 @@ dt = DiagnosticsToolbox(m)
 dt.report_structural_issues()
 # dt.display_underconstrained_set()
 m.fs.unit.feed_side.properties_interface[0.0,0.0].temperature.fix(298.15) # K
+print('before initialize dof = ', degrees_of_freedom(m))
 m.fs.unit.initialize()
-
 # Check that degrees of freedom = 0 before attempting simulation.
 # This means that the performance of the flowsheet is completely
 # determined by the system variables that were fixed above.
+print('after initialize dof = ', degrees_of_freedom(m))
 # assert degrees_of_freedom(m) == 0
 # Setup solver
-solver = get_solver()
+# solver = get_solver()
 # Run simulation
-simulation_results = solver.solve(m)
+# simulation_results = solver.solve(m)
 # Display report, reports include a small subset of the most important variables
-m.fs.unit.display()
+m.fs.unit.pprint()
+assert False
 # Display all results, this shows all variables and constraints
 # m.fs.unit.display()
 
 m.fs.unit.fix_initial_conditions()
+print('before FD dof = ', degrees_of_freedom(m))
 
 time_nfe = len(m.fs.time) - 1
+print(time_nfe)
 
 pyo.TransformationFactory("dae.finite_difference").apply_to(
     m.fs, nfe=time_nfe, wrt=m.fs.time, scheme="BACKWARD"
 )
+print('after FD dof = ', degrees_of_freedom(m))
 scaling_log = idaeslog.getLogger("idaes.core.util.scaling")
 scaling_log.setLevel(idaeslog.ERROR)
 iscale.calculate_scaling_factors(m)
@@ -138,7 +147,7 @@ results = petsc.petsc_dae_by_time_element(
     initial_solver_options={
         "constr_viol_tol": 1e-8,
         "nlp_scaling_method": "user-scaling",
-        "linear_solver": "mumps",
+        "linear_solver": "ma27",
         "OF_ma57_automatic_scaling": "yes",
         "max_iter": 300,
         "tol": 1e-8,

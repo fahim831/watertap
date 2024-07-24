@@ -19,13 +19,14 @@ class OperatingScenario(Enum):
     dynamic = 2
 
 def main():
-    operating_scenario = OperatingScenario.steady_state
+    operating_scenario = OperatingScenario.dynamic
 
     m = pyo.ConcreteModel()
-    t_start = 0 * 60 # s
-    t_end = 1 * 3 # s
-    dt_set = [t_start, t_end]
-    time_set = [sum(dt_set[:j]) for j in range(len(dt_set)+1)]
+    # t_start = 0 * 60 # s
+    # t_end = 1 * 3 # s
+    # dt_set = [t_start, t_end]
+    # time_set = [sum(dt_set[:j]) for j in range(len(dt_set)+1)]
+    # print(time_set)
     # time_set = np.arange(100)*0.0001
     
     if operating_scenario == OperatingScenario.steady_state:
@@ -33,7 +34,7 @@ def main():
     else:
         m.fs = FlowsheetBlock(
             dynamic=True,
-            time_set=time_set,
+            time_set=[0, 1, 2, 3],
             time_units=pyo.units.s
         )
     m.fs.properties = NaClParameterBlock()
@@ -62,6 +63,8 @@ def main():
 
     # iscale.calculate_scaling_factors(m)
     m.fs.wtank.initialize(outlvl=3)
+    m.fs.wtank.pprint()
+    assert False
 
     # Solve the simulation using ipopt
     # Note: If the degrees of freedom = 0, we have a square problem
@@ -139,12 +142,12 @@ def main():
                 "-snes_stol": 0,
                 "-snes_atol": 1e-6,
             },
-            skip_initial=True,
+            skip_initial=False,
             initial_solver="ipopt",
             initial_solver_options={
                 "constr_viol_tol": 1e-8,
                 "nlp_scaling_method": "user-scaling",
-                "linear_solver": "mumps",
+                "linear_solver": "ma27",
                 "OF_ma57_automatic_scaling": "yes",
                 "max_iter": 300,
                 "tol": 1e-8,
